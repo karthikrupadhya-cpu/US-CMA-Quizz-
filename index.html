@@ -1,0 +1,728 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .header, .footer {
+            background-color: #3d3d3d;
+        }
+        .topic-bar {
+            background-color: #63a93a;
+        }
+        .sidebar {
+            background-color: #f7f7f7;
+        }
+        .main-content {
+            background-color: #ffffff;
+        }
+        .btn-green-flag {
+            background-color: #63a93a;
+        }
+        .question-num-box {
+            width: 100%;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #d1d5db;
+            cursor: pointer;
+            position: relative;
+            border-radius: 3px;
+            font-weight: 500;
+            background-color: white;
+        }
+        .question-num-box.current {
+            background-color: #63a93a;
+            color: white;
+            border-color: #63a93a;
+        }
+        .question-num-box.answered {
+            background-color: #e5e7eb;
+        }
+        .flag-icon {
+            color: #f59e0b; /* amber-500 */
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 0.8rem;
+            background: #f7f7f7;
+            padding: 2px;
+            border-radius: 50%;
+        }
+        .option {
+            transition: border-color 0.2s ease-in-out;
+        }
+        .option:hover {
+            border-color: #3b82f6; /* blue-500 */
+        }
+        .option.correct {
+            border-color: #16a34a; /* green-600 */
+            background-color: #f0fdf4; /* green-50 */
+        }
+        .option.incorrect {
+            border-color: #dc2626; /* red-600 */
+            background-color: #fef2f2; /* red-50 */
+        }
+        .option.disabled {
+            pointer-events: none;
+            opacity: 0.9;
+        }
+        .right-sidebar-icon {
+            transition: color 0.2s ease-in-out;
+        }
+        .right-sidebar-icon:hover {
+            color: #1f2937;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col text-gray-800">
+
+    <!-- Quiz Interface -->
+    <div id="quiz-container" class="flex flex-col h-full">
+        <!-- Top Header -->
+        <header class="header text-white px-4 py-2 flex items-center justify-between text-sm shadow-md">
+            <div class="flex items-center space-x-6">
+                <p>Question: <span id="question-number-header">1</span></p>
+                <p>Section: 1</p>
+            </div>
+            <div class="flex items-center space-x-4 w-1/2 max-w-lg">
+                 <div class="flex items-center space-x-2 text-gray-300">
+                    <i class="far fa-clock"></i>
+                    <p class="whitespace-nowrap">Question Time Elapsed <span id="question-timer" class="text-white font-semibold">00:00:00</span></p>
+                </div>
+                <div class="flex items-center w-full space-x-2">
+                    <p class="text-xs text-gray-300">Progress</p>
+                    <div class="w-full bg-gray-600 rounded-full h-2">
+                        <div id="progress-bar" class="bg-white h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="progress-percent" class="text-xs font-semibold w-8 text-right">0%</p>
+                </div>
+                <button id="finish-test-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-4 rounded text-xs whitespace-nowrap">
+                    Finish Test
+                </button>
+            </div>
+        </header>
+
+        <!-- Topic Bar -->
+        <div id="topic-bar" class="topic-bar text-white px-4 py-1.5 flex justify-between text-sm font-semibold">
+            <p id="quiz-topic"></p>
+            <p id="question-id-num"></p>
+        </div>
+
+        <!-- Main Layout -->
+        <div class="flex flex-grow overflow-hidden">
+            <!-- Left Sidebar: Question Palette -->
+            <aside class="sidebar w-28 p-4 overflow-y-auto border-r border-gray-300">
+                <h3 class="font-bold mb-4 text-gray-600 text-sm">MCQS</h3>
+                <div id="question-palette" class="flex flex-col space-y-2">
+                    <!-- Question numbers will be injected here by JS -->
+                </div>
+            </aside>
+
+            <!-- Main Content: Question and Options -->
+            <main class="main-content flex-grow p-6 overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <span class="mr-2 bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-medium">LOS: <span id="los-tag" class="font-bold"></span></span>
+                        <span class="bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded text-xs font-medium">Skill Level: <span id="skill-level-tag" class="font-bold"></span></span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button class="border border-gray-300 bg-gray-50 text-gray-700 px-3 py-1 rounded-md text-sm hover:bg-gray-100 flex items-center"><i class="fas fa-calculator mr-2 text-gray-500"></i> Calculator <i class="fas fa-external-link-alt ml-2 text-xs text-gray-400"></i></button>
+                        <button class="border border-gray-300 bg-gray-50 text-gray-700 px-3 py-1 rounded-md text-sm hover:bg-gray-100 flex items-center"><i class="fas fa-table mr-2 text-gray-500"></i> Time Value Tables <i class="fas fa-external-link-alt ml-2 text-xs text-gray-400"></i></button>
+                    </div>
+                </div>
+                <div id="question-text" class="text-base mb-6 leading-relaxed">
+                    <!-- Question text goes here -->
+                </div>
+                <div id="options-container" class="space-y-3">
+                    <!-- Options go here -->
+                </div>
+                <div id="explanation-container" class="mt-6 border-t pt-4 hidden">
+                     <!-- Explanation goes here -->
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Tools -->
+            <aside class="sidebar w-16 flex p-2 border-l border-gray-300">
+                <div class="flex-grow flex flex-col items-center space-y-5 text-gray-500 text-xl pt-4">
+                    <button title="Palette" class="right-sidebar-icon"><i class="fas fa-palette"></i></button>
+                    <button title="Education" class="right-sidebar-icon"><i class="fas fa-graduation-cap"></i></button>
+                    <button title="Notes" class="right-sidebar-icon"><i class="fas fa-list-alt"></i></button>
+                    <button title="Documents" class="right-sidebar-icon"><i class="fas fa-file-alt"></i></button>
+                    <button title="Desktop" class="right-sidebar-icon"><i class="fas fa-desktop"></i></button>
+                    <button title="Print" class="right-sidebar-icon"><i class="fas fa-print"></i></button>
+                    <button title="Favorite" class="right-sidebar-icon"><i class="fas fa-star"></i></button>
+                    <button id="flag-btn-sidebar" title="Flag Question" class="right-sidebar-icon">
+                        <i class="fas fa-flag"></i>
+                    </button>
+                    <button title="Settings" class="right-sidebar-icon"><i class="fas fa-cog"></i></button>
+                </div>
+                <div class="w-1.5 h-full py-4">
+                    <div class="bg-gray-300 h-full w-full rounded-full relative">
+                        <div class="bg-gray-500 h-1/4 w-full rounded-full absolute top-0"></div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Bottom Footer -->
+        <footer class="footer text-white px-4 py-1.5 flex items-center justify-between">
+            <button class="text-xl">
+                <i class="fas fa-th"></i>
+            </button>
+            <div class="flex items-center space-x-2">
+                <button id="flag-btn-footer" class="btn-green-flag w-10 h-10 flex items-center justify-center rounded">
+                    <i class="fas fa-flag"></i>
+                </button>
+                <button id="back-btn" class="bg-gray-500 hover:bg-gray-600 font-bold py-2 px-4 rounded flex items-center text-sm"><i class="fas fa-chevron-left mr-2 text-xs"></i> Back</button>
+                <button id="next-btn" class="bg-gray-600 hover:bg-gray-700 font-bold py-2 px-4 rounded flex items-center text-sm">Next <i class="fas fa-chevron-right ml-2 text-xs"></i></button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Finish Test Modal -->
+    <div id="finish-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 shadow-xl text-center">
+            <h2 class="text-2xl font-bold mb-4">Are you sure?</h2>
+            <p class="mb-6">Do you want to finish the test and view your results?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancel-finish-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded">Cancel</button>
+                <button id="confirm-finish-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Screen -->
+    <div id="results-screen" class="hidden h-screen w-screen bg-gray-100 p-8 flex flex-col items-center justify-center">
+        <div class="bg-white p-10 rounded-lg shadow-2xl w-full max-w-4xl text-center">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">Quiz Results</h1>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+                <div class="bg-blue-100 p-4 rounded-lg">
+                    <p class="text-lg text-blue-800">Final Score</p>
+                    <p id="final-score" class="text-3xl font-bold text-blue-900"></p>
+                </div>
+                <div class="bg-purple-100 p-4 rounded-lg">
+                    <p class="text-lg text-purple-800">Total Questions</p>
+                    <p id="total-questions-results" class="text-3xl font-bold text-purple-900"></p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg">
+                    <p class="text-lg text-yellow-800">Avg. Time / Question</p>
+                    <p id="avg-time" class="text-3xl font-bold text-yellow-900"></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left mt-8">
+                <div>
+                    <h3 class="font-bold text-xl mb-3 text-red-600">Incorrectly Answered</h3>
+                    <ul id="incorrect-questions-list" class="list-disc list-inside space-y-1 text-gray-700"></ul>
+                </div>
+                <div>
+                    <h3 class="font-bold text-xl mb-3 text-amber-600">Flagged Questions</h3>
+                    <ul id="flagged-questions-list" class="list-disc list-inside space-y-1 text-gray-700"></ul>
+                </div>
+            </div>
+
+            <div class="mt-10 flex flex-wrap justify-center gap-4">
+                <button id="review-btn" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded">Review Each Answer</button>
+                <button id="reattempt-incorrect-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">Re-attempt Incorrect</button>
+                <button id="reattempt-flagged-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded">Re-attempt Flagged</button>
+                <button id="reattempt-full-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Re-attempt Full Quiz</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const originalQuestions = [
+        {
+            id: 1,
+            los: "1A1g",
+            skillLevel: "A",
+            topic: "MCQS | U1 - M1 (Optional) Background: Accounting Cycle",
+            questionIdNum: "MCQ-15514",
+            question: "A company prepares a document at the end of the accounting period after all adjusting entries are recorded. This document proves that total debits are equal to total credits and is used in the preparation of the financial statements. This statement is called:",
+            options: [
+                { text: "Post-closing trial balance.", isCorrect: false },
+                { text: "Adjusted trial balance.", isCorrect: true },
+                { text: "Adjusted statement of financial position.", isCorrect: false },
+                { text: "Adjusted income statement.", isCorrect: false }
+            ],
+            explanation: {
+                a: "Choice 'A' is incorrect. A post-closing trial balance is prepared after closing entries are made, and it contains only permanent (balance sheet) accounts. The statement described in the question includes all accounts before closing and is used to prepare the financial statements.",
+                b: "Choice 'B' is correct. The adjusted trial balance is prepared after all adjusting entries have been recorded and posted. Its purpose is to prove the equality of total debit and credit balances before the financial statements are prepared.",
+                c: "Choice 'C' is incorrect. A statement of financial position (or balance sheet) is one of the financial statements prepared from the adjusted trial balance; it is not the trial balance itself.",
+                d: "Choice 'D' is incorrect. An income statement is another financial statement prepared using the data from the adjusted trial balance; it is not the document used to prove that debits equal credits."
+            }
+        },
+        {
+            id: 2,
+            los: "1.A.1b",
+            skillLevel: "Analysis",
+            topic: "Cost Management | CSFs",
+            questionIdNum: "MCQ-15515",
+            question: "Based on the definition in the text, which of the following best describes a 'critical success factor' (CSF)?",
+            options: [
+                { text: "Any factor that contributes to the company's daily operational tasks.", isCorrect: false },
+                { text: "A variable that has a direct and significant impact on the company's competitive advantage and success.", isCorrect: true },
+                { text: "A financial metric used exclusively for shareholder reports.", isCorrect: false },
+                { text: "A short-term goal set by a department manager.", isCorrect: false }
+            ],
+            explanation: {
+                a: "Choice 'A' is incorrect. The definition specifies a 'limited number' of factors, implying they are not just any daily task but the most crucial ones for overall success.",
+                b: "Choice 'B' is correct. The text defines CSFs as 'the aspects of the company’s performance that are essential to its competitive advantage and therefore to its success' and have a 'direct and important impact'.",
+                c: "Choice 'C' is incorrect because the text notes that CSFs can include non-financial elements like 'new products introduced' or 'an increase in market share', not just financial metrics.",
+                d: "Choice 'D' is incorrect. CSFs are high-level strategic variables essential to the entire organization's viability, not just short-term departmental goals."
+            }
+        },
+        {
+            id: 3,
+            los: "1.B.2a",
+            skillLevel: "Application",
+            topic: "Performance | Effectiveness & Efficiency",
+            questionIdNum: "MCQ-15516",
+            question: "A company successfully launches a new product and meets its sales targets, but the marketing campaign costs 50% more than budgeted. How would this company's operation be described?",
+            options: [
+                { text: "Both effective and efficient.", isCorrect: false },
+                { text: "Neither effective nor efficient.", isCorrect: false },
+                { text: "Efficient but not effective.", isCorrect: false },
+                { text: "Effective but not efficient.", isCorrect: true }
+            ],
+            explanation: {
+                a: "Choice 'A' is incorrect. The operation cannot be described as efficient because it spent significantly more resources (50% over budget) than planned.",
+                b: "Choice 'B' is incorrect. The operation was effective because it successfully achieved its primary goal of meeting sales targets for the new product launch.",
+                c: "Choice 'C' is incorrect. This reverses the situation. The company achieved its goal (making it effective) but overspent its resources (making it inefficient).",
+                d: "Choice 'D' is correct. The company was effective because it achieved its goal ('attains its goal of increasing sales'). However, it was not efficient because it 'spends more of its resources than necessary' to do so."
+            }
+        },
+        {
+            id: 4,
+            los: "1.A.1c",
+            skillLevel: "Comprehension",
+            topic: "Cost Management | Strategy",
+            questionIdNum: "MCQ-15517",
+            question: "What does 'strategic cost management' specifically focus on?",
+            options: [
+                { text: "The day-to-day transaction reporting for accounting purposes.", isCorrect: false },
+                { text: "Reducing operational costs across all departments equally.", isCorrect: false },
+                { text: "Issues related to competitive advantage, such as the costs of adding distinctive product features.", isCorrect: true },
+                { text: "The preparation of the company's master budget.", isCorrect: false }
+            ],
+            explanation: {
+                a: "Choice 'A' is incorrect. This is described as a basic function of a cost management system, whereas strategic cost management is more specialized and forward-looking.",
+                b: "Choice 'B' is incorrect. A strategic approach is targeted and nuanced, not a simple, equal reduction of costs which could harm critical areas.",
+                c: "Choice 'C' is correct. The text explicitly states that strategic cost management 'specifically focuses on strategic issues' like the company's 'cost, productivity, or efficiency advantage... relative to competitors' and pricing for 'distinctive' features.",
+                d: "Choice 'D' is incorrect. While the master budget is an important management tool, strategic cost management is the higher-level analysis and philosophy that informs how such tools are used to gain a competitive edge."
+            }
+        },
+        {
+            id: 5,
+            los: "1.B.2b",
+            skillLevel: "Analysis",
+            topic: "Performance | Effectiveness & Efficiency",
+            questionIdNum: "MCQ-15518",
+            question: "What is the fundamental difference between an 'effective operation' and an 'efficient operation' as described in the text?",
+            options: [
+                { text: "Effectiveness is about using minimal resources, while efficiency is about achieving high sales.", isCorrect: false },
+                { text: "There is no difference; the terms are used interchangeably in cost management.", isCorrect: false },
+                { text: "Effectiveness concerns achieving goals, while efficiency concerns the use of resources to achieve those goals.", isCorrect: true },
+                { text: "Effectiveness is measured by profitability, while efficiency is measured by market share.", isCorrect: false }
+            ],
+            explanation: {
+                a: "Choice 'A' is incorrect as it reverses the definitions. Efficiency is about resource use, and effectiveness is about achieving goals (like high sales).",
+                b: "Choice 'B' is incorrect. The text explicitly states that 'assessments of efficiency are independent from assessments of effectiveness,' clearly distinguishing them.",
+                c: "Choice 'C' is correct. This captures the core distinction made in the text: 'An effective operation is one that achieves or exceeds the goals set,' and 'An efficient operation is one that makes effective use of its resources.'",
+                d: "Choice 'D' is incorrect. The text provides both profitability ('operating income') and market share as examples of goals related to effectiveness, not as a way to distinguish it from efficiency."
+            }
+        }
+    ];
+
+    // State
+    let allQuestions = [];
+    let currentQuestionIndex = 0;
+    let userAnswers = [];
+    let flaggedQuestions = new Set();
+    let incorrectQuestionIds = new Set();
+    let questionTimerInterval;
+    let timeSpentOnCurrentQuestion = 0;
+    let isReviewMode = false;
+
+    // UI Elements
+    const quizContainer = document.getElementById('quiz-container');
+    const resultsScreen = document.getElementById('results-screen');
+
+    // Header
+    const questionNumberHeader = document.getElementById('question-number-header');
+    const questionTimer = document.getElementById('question-timer');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const finishTestBtn = document.getElementById('finish-test-btn');
+    
+    // Topic Bar
+    const quizTopic = document.getElementById('quiz-topic');
+    const questionIdNum = document.getElementById('question-id-num');
+
+    // Left Sidebar
+    const questionPalette = document.getElementById('question-palette');
+    
+    // Main Content
+    const losTag = document.getElementById('los-tag');
+    const skillLevelTag = document.getElementById('skill-level-tag');
+    const questionText = document.getElementById('question-text');
+    const optionsContainer = document.getElementById('options-container');
+    const explanationContainer = document.getElementById('explanation-container');
+
+    // Right Sidebar
+    const flagBtnSidebar = document.getElementById('flag-btn-sidebar');
+
+    // Footer
+    const flagBtnFooter = document.getElementById('flag-btn-footer');
+    const backBtn = document.getElementById('back-btn');
+    const nextBtn = document.getElementById('next-btn');
+    
+    // Modal
+    const finishModal = document.getElementById('finish-modal');
+    const cancelFinishBtn = document.getElementById('cancel-finish-btn');
+    const confirmFinishBtn = document.getElementById('confirm-finish-btn');
+    
+    // Results
+    const finalScoreEl = document.getElementById('final-score');
+    const totalQuestionsResultsEl = document.getElementById('total-questions-results');
+    const avgTimeEl = document.getElementById('avg-time');
+    const incorrectListEl = document.getElementById('incorrect-questions-list');
+    const flaggedListEl = document.getElementById('flagged-questions-list');
+    const reviewBtn = document.getElementById('review-btn');
+    const reattemptIncorrectBtn = document.getElementById('reattempt-incorrect-btn');
+    const reattemptFlaggedBtn = document.getElementById('reattempt-flagged-btn');
+    const reattemptFullBtn = document.getElementById('reattempt-full-btn');
+
+
+    // Functions
+    const formatTime = (seconds) => {
+        const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+        const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+        const s = String(seconds % 60).padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    };
+
+    const startQuestionTimer = () => {
+        clearInterval(questionTimerInterval);
+        timeSpentOnCurrentQuestion = userAnswers[currentQuestionIndex]?.timeSpent || 0;
+        questionTimer.textContent = formatTime(timeSpentOnCurrentQuestion);
+        
+        if (!isReviewMode && !userAnswers[currentQuestionIndex]) { // Only run timer if not in review and question is unanswered
+            questionTimerInterval = setInterval(() => {
+                timeSpentOnCurrentQuestion++;
+                questionTimer.textContent = formatTime(timeSpentOnCurrentQuestion);
+            }, 1000);
+        }
+    };
+
+    const renderQuestionPalette = () => {
+        questionPalette.innerHTML = '';
+        allQuestions.forEach((q, index) => {
+            const box = document.createElement('div');
+            box.className = 'question-num-box';
+            box.textContent = index + 1;
+            
+            if (index === currentQuestionIndex) {
+                box.classList.add('current');
+            }
+            if (userAnswers[index] !== null) {
+                box.classList.add('answered');
+            }
+
+            if (flaggedQuestions.has(q.id)) { // Check flag by original question ID
+                const flag = document.createElement('i');
+                flag.className = 'fas fa-flag flag-icon';
+                box.appendChild(flag);
+            }
+
+            box.addEventListener('click', () => goToQuestion(index));
+            questionPalette.appendChild(box);
+        });
+    };
+
+    const loadQuestion = () => {
+        clearInterval(questionTimerInterval);
+
+        const question = allQuestions[currentQuestionIndex];
+        
+        questionNumberHeader.textContent = `${currentQuestionIndex + 1} of ${allQuestions.length}`;
+        quizTopic.textContent = question.topic;
+        questionIdNum.textContent = question.questionIdNum;
+
+        losTag.textContent = question.los;
+        skillLevelTag.textContent = question.skillLevel;
+        questionText.textContent = question.question;
+
+        optionsContainer.innerHTML = '';
+        question.options.forEach((option, index) => {
+            const optionChar = String.fromCharCode(65 + index);
+            const optionEl = document.createElement('div');
+            optionEl.className = 'option border border-gray-300 p-3 rounded-md cursor-pointer flex items-start';
+            optionEl.innerHTML = `<span class="font-bold mr-4">${optionChar}.</span> <p>${option.text}</p>`;
+            optionEl.dataset.index = index;
+            optionEl.addEventListener('click', handleOptionClick);
+            optionsContainer.appendChild(optionEl);
+        });
+
+        explanationContainer.innerHTML = '';
+        explanationContainer.classList.add('hidden');
+
+        if (userAnswers[currentQuestionIndex] || isReviewMode) {
+            showAnswerFeedback();
+        } 
+        
+        startQuestionTimer();
+        updateNavigationButtons();
+        updateFlagState();
+        renderQuestionPalette();
+    };
+
+    const showAnswerFeedback = () => {
+        const userAnswer = userAnswers[currentQuestionIndex];
+        if (!userAnswer) return;
+
+        clearInterval(questionTimerInterval);
+        const correctOptionIndex = allQuestions[currentQuestionIndex].options.findIndex(opt => opt.isCorrect);
+        const options = optionsContainer.querySelectorAll('.option');
+
+        options.forEach((optEl, index) => {
+            optEl.classList.add('disabled');
+            if (index === correctOptionIndex) {
+                optEl.classList.add('correct');
+            }
+            if (userAnswer && index === userAnswer.selectedIndex && !userAnswer.isCorrect) {
+                optEl.classList.add('incorrect');
+            }
+        });
+        
+        renderExplanation();
+    };
+    
+    const renderExplanation = () => {
+        const question = allQuestions[currentQuestionIndex];
+        let explanationHTML = '<h3 class="font-bold text-lg mb-2">Explanation</h3>';
+        Object.keys(question.explanation).forEach((key, index) => {
+            const optionChar = String.fromCharCode(65 + index);
+            explanationHTML += `<div class="mb-2"><p class="font-semibold">${optionChar}:</p><p>${question.explanation[key]}</p></div>`;
+        });
+        explanationContainer.innerHTML = explanationHTML;
+        explanationContainer.classList.remove('hidden');
+    }
+
+    const handleOptionClick = (event) => {
+        if (isReviewMode || userAnswers[currentQuestionIndex]) return;
+
+        clearInterval(questionTimerInterval);
+
+        const selectedOptionEl = event.currentTarget;
+        const selectedIndex = parseInt(selectedOptionEl.dataset.index);
+        const question = allQuestions[currentQuestionIndex];
+        const isCorrect = question.options[selectedIndex].isCorrect;
+
+        userAnswers[currentQuestionIndex] = {
+            selectedIndex,
+            isCorrect,
+            timeSpent: timeSpentOnCurrentQuestion,
+        };
+        
+        showAnswerFeedback();
+        updateProgressBar();
+        renderQuestionPalette();
+    };
+
+    const updateProgressBar = () => {
+        const answeredCount = userAnswers.filter(a => a !== null).length;
+        const percentage = allQuestions.length > 0 ? Math.round((answeredCount / allQuestions.length) * 100) : 0;
+        progressBar.style.width = `${percentage}%`;
+        progressPercent.textContent = `${percentage}%`;
+    };
+
+    const updateNavigationButtons = () => {
+        backBtn.disabled = currentQuestionIndex === 0;
+        nextBtn.disabled = currentQuestionIndex === allQuestions.length - 1;
+        backBtn.classList.toggle('opacity-50', backBtn.disabled);
+        nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
+    };
+
+    const updateFlagState = () => {
+        const questionId = allQuestions[currentQuestionIndex].id;
+        const isFlagged = flaggedQuestions.has(questionId);
+        flagBtnSidebar.classList.toggle('text-amber-500', isFlagged);
+        flagBtnFooter.classList.toggle('bg-amber-500', isFlagged);
+        flagBtnFooter.classList.toggle('btn-green-flag', !isFlagged);
+    };
+
+    const toggleFlag = () => {
+        const questionId = allQuestions[currentQuestionIndex].id;
+        if (flaggedQuestions.has(questionId)) {
+            flaggedQuestions.delete(questionId);
+        } else {
+            flaggedQuestions.add(questionId);
+        }
+        updateFlagState();
+        renderQuestionPalette();
+    };
+
+    const nextQuestion = () => {
+        if (currentQuestionIndex < allQuestions.length - 1) {
+            currentQuestionIndex++;
+            loadQuestion();
+        }
+    };
+
+    const previousQuestion = () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            loadQuestion();
+        }
+    };
+    
+    const goToQuestion = (index) => {
+        if(index >= 0 && index < allQuestions.length) {
+            currentQuestionIndex = index;
+            loadQuestion();
+        }
+    }
+
+    const showResults = () => {
+        clearInterval(questionTimerInterval);
+        
+        let correctAnswers = 0;
+        let totalTime = 0;
+        let answeredCount = 0;
+        incorrectListEl.innerHTML = '';
+        flaggedListEl.innerHTML = '';
+        incorrectQuestionIds.clear();
+
+        userAnswers.forEach((answer, index) => {
+            if (answer) {
+                if (answer.isCorrect) {
+                    correctAnswers++;
+                } else {
+                    const questionId = allQuestions[index].id;
+                    incorrectQuestionIds.add(questionId);
+                    const li = document.createElement('li');
+                    li.textContent = `Question ${questionId}: ${allQuestions[index].question.substring(0, 50)}...`;
+                    incorrectListEl.appendChild(li);
+                }
+                totalTime += answer.timeSpent;
+                answeredCount++;
+            }
+        });
+        
+        if (incorrectListEl.children.length === 0) {
+             incorrectListEl.innerHTML = '<li>No incorrect answers! Great job!</li>';
+        }
+
+        flaggedQuestions.forEach(questionId => {
+            const question = originalQuestions.find(q => q.id === questionId);
+            if (question) {
+                const li = document.createElement('li');
+                li.textContent = `Question ${question.id}: ${question.question.substring(0, 50)}...`;
+                flaggedListEl.appendChild(li);
+            }
+        });
+        
+        if (flaggedListEl.children.length === 0) {
+            flaggedListEl.innerHTML = '<li>No questions were flagged.</li>';
+        }
+
+        const score = allQuestions.length > 0 ? Math.round((correctAnswers / allQuestions.length) * 100) : 0;
+        const avgTime = answeredCount > 0 ? Math.round(totalTime / answeredCount) : 0;
+        
+        finalScoreEl.textContent = `${score}%`;
+        totalQuestionsResultsEl.textContent = allQuestions.length;
+        avgTimeEl.textContent = formatTime(avgTime);
+        
+        quizContainer.classList.add('hidden');
+        resultsScreen.classList.remove('hidden');
+    };
+
+    const resetAndStartQuiz = (questions) => {
+        allQuestions = questions;
+        currentQuestionIndex = 0;
+        userAnswers = new Array(questions.length).fill(null);
+        isReviewMode = false;
+
+        if (questions.length === originalQuestions.length) {
+            flaggedQuestions.clear();
+            incorrectQuestionIds.clear();
+        }
+
+        resultsScreen.classList.add('hidden');
+        quizContainer.classList.remove('hidden');
+        
+        updateProgressBar();
+        loadQuestion();
+    };
+
+    // Event Listeners
+    nextBtn.addEventListener('click', nextQuestion);
+    backBtn.addEventListener('click', previousQuestion);
+    flagBtnSidebar.addEventListener('click', toggleFlag);
+    flagBtnFooter.addEventListener('click', toggleFlag);
+
+    finishTestBtn.addEventListener('click', () => {
+        finishModal.classList.remove('hidden');
+    });
+
+    cancelFinishBtn.addEventListener('click', () => {
+        finishModal.classList.add('hidden');
+    });
+
+    confirmFinishBtn.addEventListener('click', () => {
+        finishModal.classList.add('hidden');
+        showResults();
+    });
+
+    // Results screen buttons
+    reattemptFullBtn.addEventListener('click', () => {
+        resetAndStartQuiz(originalQuestions);
+    });
+
+    reviewBtn.addEventListener('click', () => {
+        isReviewMode = true;
+        currentQuestionIndex = 0;
+        resultsScreen.classList.add('hidden');
+        quizContainer.classList.remove('hidden');
+        loadQuestion();
+    });
+
+    reattemptIncorrectBtn.addEventListener('click', () => {
+        const incorrectQuestions = originalQuestions.filter(q => incorrectQuestionIds.has(q.id));
+        if (incorrectQuestions.length > 0) {
+            resetAndStartQuiz(incorrectQuestions);
+        } else {
+            alert("No incorrect questions to re-attempt!");
+        }
+    });
+
+    reattemptFlaggedBtn.addEventListener('click', () => {
+        const flaggedSubset = originalQuestions.filter(q => flaggedQuestions.has(q.id));
+        if (flaggedSubset.length > 0) {
+            resetAndStartQuiz(flaggedSubset);
+        } else {
+            alert("No flagged questions to re-attempt!");
+        }
+    });
+
+    // Initial Load
+    resetAndStartQuiz(originalQuestions);
+});
+</script>
+</body>
+</html>

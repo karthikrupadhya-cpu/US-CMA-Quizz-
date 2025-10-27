@@ -1,0 +1,5 @@
+{
+  "name": "Interactive Quiz Application",
+  "description": "A fully interactive quiz application built in a single HTML file. It features question navigation, timers, instant feedback, progress tracking, and a results screen. The quiz content is dynamically generated based on provided text.",
+  "requestFramePermissions": []
+}
